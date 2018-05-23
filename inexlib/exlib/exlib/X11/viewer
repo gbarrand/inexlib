@@ -1,0 +1,75 @@
+// Copyright (C) 2010, Guy Barrand. All rights reserved.
+// See the file exlib.license for terms.
+
+#ifndef exlib_X11_viewer
+#define exlib_X11_viewer
+
+// pure X11 rendering (no GL here).
+
+#include <inlib/sg/viewer>
+
+#include "xgra_action"
+
+namespace exlib {
+namespace X11 {
+
+class viewer : public inlib::sg::viewer {
+  INLIB_HEADER(viewer,exlib::X11::viewer,inlib::sg::viewer)
+public:
+  void render() {
+    if(!m_ww) return;
+    if(!m_wh) return;
+
+    if(!m_mgr.create_pixmap(m_ww,m_wh)) {}
+
+    m_mgr.begin_render(0,0,m_ww,m_wh,
+                       m_clear_color.r(),
+                       m_clear_color.g(),
+                       m_clear_color.b(),
+                       m_clear_color.a());
+
+    xgra_action action(m_mgr,m_out,m_ww,m_wh);
+    action.state().m_use_gsto = m_use_gsto;
+
+    m_sg.render(action);
+    if(!action.end()) { //check that matrices stack are ok.
+      m_out << "exib::sg::viewer :" 
+            << " bad gl_action end."
+            << std::endl;
+    }
+
+    //after_render();
+
+    m_mgr.end_render();
+
+    m_mgr.pixmap2win();
+  }
+
+public:
+  viewer(std::ostream& a_out,Display* a_display,Window a_window,unsigned int a_width,unsigned int a_height)
+  :parent(a_out,a_width,a_height)
+  ,m_mgr(a_out,a_display,a_window)
+  {}
+  virtual ~viewer(){
+    //WARNING : nodes may refer m_mgr (to handle gstos/texs), then
+    //          we have to delete them first.
+    m_sg.clear();
+  }
+protected:
+  viewer(const viewer& a_from)
+  :parent(a_from)
+  ,m_mgr(a_from.out(),0,0)
+  {}
+  viewer& operator=(const viewer& a_from){
+    parent::operator=(a_from);
+    return *this;
+  }
+protected:
+  xgra_manager m_mgr;
+};
+
+}}
+
+//exlib_build_use inlib X11
+
+#endif

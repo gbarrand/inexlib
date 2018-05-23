@@ -1,0 +1,10 @@
+
+ To build :
+   cd ./inexlib/exlib/examples/cpp
+   ./build <app>.cpp
+ or to have a light traceback :
+   ./build -v <app>.cpp
+
+ To run :
+   ./bin_[gnu,clang]/<app> [options]
+

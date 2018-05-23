@@ -1,0 +1,112 @@
+// Copyright (C) 2010, Guy Barrand. All rights reserved.
+// See the file exlib.license for terms.
+
+#ifndef exlib_Windows_viewer
+#define exlib_Windows_viewer
+
+// Windows and DirectX rendering (no GL here).
+
+#include <inlib/sg/viewer>
+
+#include "DirectX_action"
+#include "window"
+
+namespace exlib {
+namespace Windows {
+
+class viewer : public window, public inlib::sg::viewer {
+  typedef window parent_window;
+  INLIB_HEADER(viewer,exlib::Windows::viewer,inlib::sg::viewer)
+public:  
+  virtual void paint(unsigned int a_w,unsigned int a_h) {
+    set_size(a_w,a_h);
+    render();
+  }
+public:
+  void render() {
+    if(!m_ww) return;
+    if(!m_wh) return;
+
+    //if(!m_mgr.create_pixmap(m_ww,m_wh)) {}
+
+    m_mgr.begin_render(0,0,m_ww,m_wh,
+                       m_clear_color.r(),
+                       m_clear_color.g(),
+                       m_clear_color.b(),
+                       m_clear_color.a());
+
+    DirectX_action action(m_mgr,m_out,m_ww,m_wh);
+    action.state().m_use_gsto = m_use_gsto;
+
+    m_sg.render(action);
+    if(!action.end()) { //check that matrices stack are ok.
+      m_out << "exib::sg::viewer :" 
+            << " bad gl_action end."
+            << std::endl;
+    }
+
+    //after_render();
+
+    m_mgr.end_render();
+
+    //m_mgr.pixmap2win();
+  }
+
+public:
+  viewer(std::ostream& a_out,unsigned int a_width,unsigned int a_height)
+  :parent_window(a_width,a_height)
+  ,parent(a_out,a_width,a_height)
+  ,m_mgr(a_out,parent_window::m_hwnd)
+  ,m_old_proc(0)
+  {
+    set_client_area_size(a_width,a_height); // enforce client area of m_hwnd to be a_width, a_height.
+
+    ::SetWindowLongPtr(m_hwnd,GWLP_USERDATA,LONG_PTR(this));
+    m_old_proc = (WNDPROC)::GetWindowLongPtr(m_hwnd,GWLP_WNDPROC);
+    ::SetWindowLongPtr(m_hwnd,GWLP_WNDPROC,(LONG_PTR)proc);
+  }
+  virtual ~viewer(){
+    ::SetWindowLongPtr(m_hwnd,GWLP_WNDPROC,(LONG_PTR)m_old_proc);
+    ::SetWindowLongPtr(m_hwnd,GWLP_USERDATA,LONG_PTR(&parent_window::get_me()));
+    //WARNING : nodes may refer m_mgr (to handle gstos/texs), then
+    //          we have to delete them first.
+    m_sg.clear();
+  }
+protected:
+  viewer(const viewer& a_from)
+  :parent_window(a_from)
+  ,parent(a_from)
+  ,m_mgr(a_from.m_mgr)
+  ,m_old_proc(0)
+  {}
+  viewer& operator=(const viewer& a_from){
+    parent::operator=(a_from);
+    return *this;
+  }
+protected:  
+  static LRESULT CALLBACK proc(HWND a_hwnd,UINT a_msg,WPARAM a_wparam,LPARAM a_lparam) {
+    switch (a_msg) { 
+    case WM_PAINT:{
+      RECT rect;
+      ::GetClientRect(a_hwnd,&rect);
+      unsigned int w = rect.right-rect.left;
+      unsigned int h = rect.bottom-rect.top;
+      viewer* _this = (viewer*)::GetWindowLongPtr(a_hwnd,GWLP_USERDATA);
+      if(_this) _this->paint(w,h);
+    ::ValidateRect(a_hwnd,NULL);
+    }return 0;
+    }
+    viewer* _this = (viewer*)::GetWindowLongPtr(a_hwnd,GWLP_USERDATA);
+    if(!_this) return 0;
+    return CallWindowProc(_this->m_old_proc,a_hwnd,a_msg,a_wparam,a_lparam);
+  }
+protected:
+  DirectX_manager m_mgr;
+  WNDPROC m_old_proc;
+};
+
+}}
+
+//exlib_build_use inlib Windows DirectX
+
+#endif
